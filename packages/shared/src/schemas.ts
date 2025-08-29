@@ -5,7 +5,6 @@ const PackageSizeSchema = z.enum(["S", "M", "L", "XL"]);
 export const ShipmentSchema = z.object({
   id: z.number(),
   size: PackageSizeSchema,
-  notes: z.string().nullable(),
   pickupAt: z.string().nullable(),
   expectedDeliveryAt: z.string().nullable(),
   deliveredAt: z.string().nullable(),
@@ -22,7 +21,6 @@ export const CreateShipmentSchema = z
     size: PackageSizeSchema,
     pickupAt: DateLikeNullable.optional(),
     expectedDeliveryAt: DateLikeNullable.optional(),
-    notes: z.string().trim().min(1).max(10_000).nullable().optional(),
   })
   .superRefine((val, ctx) => {
     if (val.originLocationId === val.destinationLocationId) {
@@ -38,7 +36,6 @@ export const UpdateShipmentSchema = z.object({
   destinationLocationId: z.number().int().positive().optional(),
   size: PackageSizeSchema.optional(),
   expectedDeliveryAt: DateLikeNullable.optional(),
-  notes: z.string().trim().min(1).max(10_000).nullable().optional(),
 });
 
 export type CreateShipment = z.infer<typeof CreateShipmentSchema>;
@@ -62,3 +59,27 @@ export const UsersArraySchema = z.array(UserSchema);
 
 export type User = z.infer<typeof UserSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
+
+export const APILocationSchema = z.object({
+  id: z.number().int().positive(),
+  nickname: z.string(),
+  address1: z.string().optional().nullable(),
+  address2: z.string().optional().nullable(),
+  city: z.string(),
+  state: z.string().optional().nullable(),
+  country: z.string(),
+  postalCode: z.string().optional().nullable(),
+  lat: z.number(),
+  lng: z.number(),
+  createdAt: z.string().optional().nullable(),
+});
+
+export const APIShipmentSchema = ShipmentSchema.extend({
+  origin: APILocationSchema.nullable(),
+  destination: APILocationSchema.nullable(),
+});
+
+export const APIShipmentsArraySchema = z.array(APIShipmentSchema);
+
+export type APILocation = z.infer<typeof APILocationSchema>;
+export type APIShipment = z.infer<typeof APIShipmentSchema>;

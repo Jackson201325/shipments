@@ -26,3 +26,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : res.text();
 }
+
+export async function markDelivered(id: number) {
+  return apiFetch(`/shipments/${id}/deliver`, { method: "POST" });
+}

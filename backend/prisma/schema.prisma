@@ -57,7 +57,6 @@ model Shipment {
   pickupAt              DateTime?
   expectedDeliveryAt    DateTime?
   deliveredAt           DateTime?
-  notes                 String?
 
   sender      User     @relation("UserShipments", fields: [senderUserId], references: [id], onDelete: Cascade)
   origin      Location @relation("ShipmentOrigin", fields: [originLocationId], references: [id], onDelete: Restrict)

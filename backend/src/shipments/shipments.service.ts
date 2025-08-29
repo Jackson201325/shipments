@@ -42,7 +42,6 @@ export class ShipmentsService {
         size: dto.size,
         pickupAt: this.toDate(dto.pickupAt) ?? undefined,
         expectedDeliveryAt: this.toDate(dto.expectedDeliveryAt) ?? undefined,
-        notes: dto.notes ?? null,
       },
       include: { origin: true, destination: true },
     });
@@ -125,7 +124,6 @@ export class ShipmentsService {
         destinationLocationId: dto.destinationLocationId,
         size: dto.size,
         expectedDeliveryAt: this.toDate(dto.expectedDeliveryAt),
-        notes: dto.notes,
       },
       include: { origin: true, destination: true },
     });

@@ -39,7 +39,6 @@ function makeShipmentData(
   senderUserId: number,
   originId: number,
   destinationId: number,
-  index: number,
 ): Prisma.ShipmentCreateInput {
   if (originId === destinationId) {
     throw new Error('origin cannot equal destination');
@@ -79,7 +78,6 @@ function makeShipmentData(
     pickupAt,
     expectedDeliveryAt,
     deliveredAt,
-    notes: `Auto-generated shipment #${index}`,
     sender: { connect: { id: senderUserId } },
     origin: { connect: { id: originId } },
     destination: { connect: { id: destinationId } },

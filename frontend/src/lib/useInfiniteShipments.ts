@@ -1,17 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
-import { PaginatedShipments } from "@app/shared";
+// frontend/src/lib/useShipments.ts
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
+import { APIShipmentsArraySchema, type APIShipment } from "@app/shared";
 import { getActiveToken } from "./devAuth";
 
-export function useShipments(page: number, perPage = 20) {
-  const token = getActiveToken(); // so cache busts when you switch user
+export function useShipments(page: number, perPage: number) {
+  const token = getActiveToken();
 
   return useQuery({
     queryKey: ["shipments", token, page, perPage],
     enabled: !!token,
-    queryFn: async () => {
+    queryFn: async (): Promise<APIShipment[]> => {
       const raw = await apiFetch(`/shipments?page=${page}&perPage=${perPage}`);
-      return PaginatedShipments.parse(raw);
+      return APIShipmentsArraySchema.parse(raw);
     },
+    placeholderData: keepPreviousData,
   });
 }

@@ -21,9 +21,9 @@ export class SupabaseService {
       : `Bearer ${authHeader}`;
 
     return {
-      apikey: this.anon, // anon public key
+      apikey: this.anon,
       'Content-Type': 'application/json',
-      Authorization: value, // Bearer token
+      Authorization: value,
       Prefer: 'return=representation',
     };
   }
