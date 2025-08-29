@@ -1,92 +1,84 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '../../database/prisma.service';
-import { ShipmentsService } from '../shipments.service';
+import { Test } from '@nestjs/testing';
+import { SupabaseService } from '../../supabase/supabase.service';
+import { ShipmentsController } from '../shipments.controllers';
 
-// We can test the real deriveStatus behavior through the service
-// (no need to mock the util), but feel free to mock it if desired.
-
-describe('ShipmentsService', () => {
-  let service: ShipmentsService;
-  let prisma: { shipment: { findMany: jest.Mock } };
+describe('ShipmentsController', () => {
+  let controller: ShipmentsController;
+  const supa = {
+    listShipments: jest.fn(),
+    getShipment: jest.fn(),
+    createShipment: jest.fn(),
+    updateShipment: jest.fn(),
+    deleteShipment: jest.fn(),
+  };
 
   beforeEach(async () => {
-    prisma = {
-      shipment: {
-        findMany: jest.fn(),
-      },
-    } as any;
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ShipmentsService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+    const module = await Test.createTestingModule({
+      controllers: [ShipmentsController],
+      providers: [{ provide: SupabaseService, useValue: supa }],
     }).compile();
 
-    service = module.get<ShipmentsService>(ShipmentsService);
+    controller = module.get(ShipmentsController);
+    jest.resetAllMocks();
   });
 
-  it('maps shipments and attaches derived status (On Time, Delayed, In Transit)', async () => {
+  it('GET /shipments maps derived status + pagination', async () => {
     const now = new Date();
-
-    prisma.shipment.findMany.mockResolvedValue([
-      // On Time
+    supa.listShipments.mockResolvedValue([
       {
         id: 1,
-        senderUserId: 10,
-        originLocationId: 1,
-        destinationLocationId: 2,
         size: 'S',
-        createdAt: now,
-        pickupAt: new Date(now.getTime() - 10 * 3600_000),
-        expectedDeliveryAt: new Date(now.getTime() - 2 * 3600_000),
-        deliveredAt: new Date(now.getTime() - 3 * 3600_000),
-        notes: 'ot',
-        origin: {},
-        destination: {},
+        notes: null,
+        pickupAt: new Date(now.getTime() - 2 * 3600_000).toISOString(),
+        expectedDeliveryAt: new Date(
+          now.getTime() - 1 * 3600_000,
+        ).toISOString(),
+        deliveredAt: new Date(now.getTime() - 90 * 60_000).toISOString(),
       },
-      // Delayed
       {
         id: 2,
-        senderUserId: 10,
-        originLocationId: 1,
-        destinationLocationId: 2,
         size: 'M',
-        createdAt: now,
-        pickupAt: new Date(now.getTime() - 6 * 3600_000),
-        expectedDeliveryAt: new Date(now.getTime() - 2 * 3600_000),
-        deliveredAt: new Date(now.getTime() - 30 * 60_000),
-        notes: 'late',
-        origin: {},
-        destination: {},
+        notes: null,
+        pickupAt: new Date(now.getTime() - 5 * 3600_000).toISOString(),
+        expectedDeliveryAt: new Date(
+          now.getTime() - 2 * 3600_000,
+        ).toISOString(),
+        deliveredAt: new Date(now.getTime() - 30 * 60_000).toISOString(),
       },
-      // In Transit (picked up, not delivered)
       {
         id: 3,
-        senderUserId: 10,
-        originLocationId: 1,
-        destinationLocationId: 2,
         size: 'L',
-        createdAt: now,
-        pickupAt: new Date(now.getTime() - 1 * 3600_000),
-        expectedDeliveryAt: new Date(now.getTime() + 6 * 3600_000),
+        notes: null,
+        pickupAt: new Date(now.getTime() - 1 * 3600_000).toISOString(),
+        expectedDeliveryAt: new Date(
+          now.getTime() + 6 * 3600_000,
+        ).toISOString(),
         deliveredAt: null,
-        notes: 'moving',
-        origin: {},
-        destination: {},
       },
     ]);
 
-    const result = await service.findAll(10);
+    const auth = 'Bearer test.jwt';
+    const res = await controller.list(auth, { page: 2, perPage: 20 }); // Zod sets defaults etc.
 
-    expect(prisma.shipment.findMany).toHaveBeenCalledWith({
-      where: { senderUserId: 10 },
-      include: { origin: true, destination: true },
-    });
+    // controller should have asked for offset 20 (page 2)
+    expect(supa.listShipments).toHaveBeenCalledWith(auth, 20, 20);
 
-    const byId = Object.fromEntries(result.map((s) => [s.id, s.status]));
+    const byId = Object.fromEntries(res.map((s: any) => [s.id, s.status]));
     expect(byId[1]).toBe('On Time');
     expect(byId[2]).toBe('Delayed');
     expect(byId[3]).toBe('In Transit');
+  });
+
+  it('GET /shipments/:id maps derived status', async () => {
+    supa.getShipment.mockResolvedValue({
+      id: 10,
+      pickupAt: null,
+      expectedDeliveryAt: null,
+      deliveredAt: new Date().toISOString(),
+    });
+
+    const out = await controller.findOne('Bearer t', 10);
+    expect(out.status).toBe('On Time');
+    expect(supa.getShipment).toHaveBeenCalledWith('Bearer t', 10);
   });
 });

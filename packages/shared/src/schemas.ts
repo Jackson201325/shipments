@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const PackageSizeSchema = z.enum(["S", "M", "L", "XL"]);
 
-const ShipmentSchema = z.object({
+export const ShipmentSchema = z.object({
   id: z.number(),
   size: PackageSizeSchema,
   notes: z.string().nullable(),
@@ -17,7 +17,6 @@ const DateLikeNullable = z.union([z.date(), z.string().datetime()]).nullable();
 
 export const CreateShipmentSchema = z
   .object({
-    senderUserId: z.number().int().positive(),
     originLocationId: z.number().int().positive(),
     destinationLocationId: z.number().int().positive(),
     size: PackageSizeSchema,

@@ -14,13 +14,16 @@
     },
     "build": {
       "dependsOn": ["^build", "typecheck"],
-      "outputs": ["dist/**", "build/**", "frontend/dist/**", ".next/**"]
+      "outputs": ["dist/**", "build/**", "frontend/dist/**"]
     },
     "preview": {
       "cache": false
     },
     "clean": {
       "cache": false
-    }
+    },
+    "test": { "dependsOn": ["^build"], "outputs": [] },
+    "test:watch": { "cache": false, "outputs": [] },
+    "test:cov": { "dependsOn": ["^build"], "outputs": ["coverage/**"] }
   }
 }

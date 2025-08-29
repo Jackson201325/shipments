@@ -1,14 +1,9 @@
 import {
-  CreateShipmentSchema,
-  UpdateShipmentSchema,
-  type CreateShipment,
-  type UpdateShipment,
-} from '@app/shared';
-import {
   Body,
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   ParseIntPipe,
   Patch,
@@ -17,81 +12,96 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { ShipmentsService } from './shipments.service';
+import { SupabaseService } from '../supabase/supabase.service';
+import { CreateShipmentSchema, UpdateShipmentSchema } from '@app/shared';
+import { deriveStatus } from '@app/shared';
 
-const ShipmentStatusSchema = z.enum(['In Transit', 'On Time', 'Delayed']);
-const ListShipmentsQuerySchema = z.object({
-  userId: z.coerce.number().int().positive(),
-  status: ShipmentStatusSchema.optional(),
+const ListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   perPage: z.coerce.number().int().min(1).max(100).default(20),
 });
-type ListShipmentsQuery = z.infer<typeof ListShipmentsQuerySchema>;
-
-const UserIdOnlySchema = z.object({
-  userId: z.coerce.number().int().positive(),
-});
-type UserIdOnly = z.infer<typeof UserIdOnlySchema>;
-const UpdateWithUserIdSchema = UpdateShipmentSchema.extend({
-  userId: z.coerce.number().int().positive(),
-});
-type UpdateWithUserId = z.infer<typeof UpdateWithUserIdSchema>;
+type ListQuery = z.infer<typeof ListQuerySchema>;
 
 @Controller('shipments')
 export class ShipmentsController {
-  constructor(private readonly shipments: ShipmentsService) {}
+  constructor(private readonly supa: SupabaseService) {}
 
   @Get()
-  list(
-    @Query(new ZodValidationPipe(ListShipmentsQuerySchema))
-    q: ListShipmentsQuery,
+  async list(
+    @Headers('authorization') auth: string | undefined,
+    @Query(new ZodValidationPipe(ListQuerySchema)) q: ListQuery,
   ) {
-    const { userId, status, page, perPage } = q;
-    return this.shipments.findAll({ userId, status, page, perPage });
+    const offset = (q.page - 1) * q.perPage;
+    const rows = await this.supa.listShipments(auth!, q.perPage, offset);
+    return rows.map((s: any) => ({
+      ...s,
+      status: deriveStatus({
+        pickupAt: s.pickupAt,
+        expectedDeliveryAt: s.expectedDeliveryAt,
+        deliveredAt: s.deliveredAt,
+      }),
+    }));
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.shipments.findOne(id);
+  async findOne(
+    @Headers('authorization') auth: string | undefined,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const s = await this.supa.getShipment(auth!, id);
+    if (!s) return null;
+    return {
+      ...s,
+      status: deriveStatus({
+        pickupAt: s.pickupAt,
+        expectedDeliveryAt: s.expectedDeliveryAt,
+        deliveredAt: s.deliveredAt,
+      }),
+    };
   }
 
   @Post()
   create(
-    @Body(new ZodValidationPipe(CreateShipmentSchema)) dto: CreateShipment,
+    @Headers('authorization') auth: string | undefined,
+    @Body(new ZodValidationPipe(CreateShipmentSchema)) body: any,
   ) {
-    return this.shipments.create(dto.senderUserId, dto);
+    return this.supa.createShipment(auth!, body);
   }
 
   @Patch(':id')
   update(
+    @Headers('authorization') auth: string | undefined,
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ZodValidationPipe(UpdateWithUserIdSchema)) dto: UpdateWithUserId,
+    @Body(new ZodValidationPipe(UpdateShipmentSchema)) body: any,
   ) {
-    const { userId, ...rest } = dto as UpdateShipment & { userId: number };
-    return this.shipments.update(id, userId, rest);
+    return this.supa.updateShipment(auth!, id, body);
   }
 
   @Delete(':id')
   remove(
+    @Headers('authorization') auth: string | undefined,
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ZodValidationPipe(UserIdOnlySchema)) body: UserIdOnly,
   ) {
-    return this.shipments.remove(id, body.userId);
+    return this.supa.deleteShipment(auth!, id);
   }
 
   @Post(':id/pickup')
   pickup(
+    @Headers('authorization') auth: string | undefined,
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ZodValidationPipe(UserIdOnlySchema)) body: UserIdOnly,
   ) {
-    return this.shipments.markPickedUp(id, body.userId);
+    return this.supa.updateShipment(auth!, id, {
+      pickupAt: new Date().toISOString(),
+    });
   }
 
   @Post(':id/deliver')
   deliver(
+    @Headers('authorization') auth: string | undefined,
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ZodValidationPipe(UserIdOnlySchema)) body: UserIdOnly,
   ) {
-    return this.shipments.markDelivered(id, body.userId);
+    return this.supa.updateShipment(auth!, id, {
+      deliveredAt: new Date().toISOString(),
+    });
   }
 }

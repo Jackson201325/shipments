@@ -1,5 +1,5 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { PaginatedShipments, type Shipment } from "@app/shared";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
 
 type PageResponse = Shipment[];

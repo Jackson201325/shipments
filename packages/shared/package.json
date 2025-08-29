@@ -2,18 +2,23 @@
   "name": "@app/shared",
   "version": "0.0.1",
   "private": true,
-  "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "license": "UNLICENSED",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "types": "./dist/esm/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json",
+    "typecheck": "tsc -p tsconfig.esm.json --noEmit",
+    "dev": "tsc -p tsconfig.esm.json --watch",
+    "clean": "rimraf dist || true",
+    "test": "tsc -p tsconfig.esm.json --noEmit",
+    "test:watch": "tsc -p tsconfig.esm.json --watch --noEmit"
+  },
   "dependencies": {
     "zod": "^3.23.8"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.json --outDir dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo 'no lint in shared yet'",
-    "dev": "npm run build -- --watch",
-    "clean": "rimraf dist || true"
   }
 }

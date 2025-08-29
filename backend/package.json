@@ -14,7 +14,10 @@
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "lint": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\"",
-    "clean": "rimraf node_modules dist || true"
+    "clean": "rimraf node_modules dist || true",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
