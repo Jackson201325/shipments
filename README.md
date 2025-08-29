@@ -13,6 +13,10 @@ It demonstrates user impersonation, dynamic shipment status, and optimistic UI u
 git clone git@github.com:Jackson201325/shipments.git
 cd shipments
 npm install
+cd backend && npx prisma generate && cd ../
+npm run build --workspace @app/shared
+npm run dev
+
 ```
 
 ### 2. Run Dev (Backend + Frontend)
@@ -26,17 +30,6 @@ npm run dev
 - Starts **NestJS backend** (Supabase proxy module, with RLS preserved).
 - Starts **React frontend** (Vite) on another port.
 - Turborepo ensures backend starts first.
-
-### 3. Seed the Database
-
-We seed demo data (users, locations, shipments) using Prisma:
-
-```bash
-npx prisma migrate reset
-npx prisma db seed
-```
-
-This creates **Alice** and **Bob** with sample shipments in different statuses (`On Time`, `In Transit`, `Delayed`, `Delivered`).
 
 ---
 
