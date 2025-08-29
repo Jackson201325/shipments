@@ -1,27 +1,115 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+// prisma/seed.ts
+import { PrismaClient, Prisma, PackageSize } from '@prisma/client';
 
+const prisma = new PrismaClient();
 const now = new Date();
-const hoursFromNow = (h) => new Date(now.getTime() + h * 3600 * 1000);
+const h = (hours: number) => new Date(now.getTime() + hours * 3600 * 1000);
+
+async function clearAll() {
+  await prisma.shipment.deleteMany();
+  await prisma.location.deleteMany();
+  await prisma.user.deleteMany();
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        -- Works if columns are IDENTITY (Prisma on PG usually is)
+        BEGIN
+          EXECUTE 'ALTER TABLE "User"     ALTER COLUMN id RESTART WITH 1';
+        EXCEPTION WHEN others THEN NULL; END;
+        BEGIN
+          EXECUTE 'ALTER TABLE "Location" ALTER COLUMN id RESTART WITH 1';
+        EXCEPTION WHEN others THEN NULL; END;
+        BEGIN
+          EXECUTE 'ALTER TABLE "Shipment" ALTER COLUMN id RESTART WITH 1';
+        EXCEPTION WHEN others THEN NULL; END;
+      END$$;
+    `);
+  } catch (_) {}
+}
+
+function rand<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+type Kind = 'inTransit' | 'onTime' | 'delayed' | 'scheduled';
+
+function makeShipmentData(
+  senderUserId: number,
+  originId: number,
+  destinationId: number,
+  index: number,
+): Prisma.ShipmentCreateInput {
+  if (originId === destinationId) {
+    throw new Error('origin cannot equal destination');
+  }
+
+  const kind: Kind = rand(['inTransit', 'onTime', 'delayed', 'scheduled']);
+
+  let pickupAt: Date | null = null;
+  let expectedDeliveryAt: Date | null = null;
+  let deliveredAt: Date | null = null;
+
+  switch (kind) {
+    case 'inTransit':
+      pickupAt = h(-Math.floor(Math.random() * 24));
+      expectedDeliveryAt = h(Math.floor(Math.random() * 24) + 2);
+      deliveredAt = null;
+      break;
+    case 'onTime':
+      pickupAt = h(-Math.floor(Math.random() * 48));
+      expectedDeliveryAt = h(-Math.floor(Math.random() * 12));
+      deliveredAt = expectedDeliveryAt; // on time
+      break;
+    case 'delayed':
+      pickupAt = h(-Math.floor(Math.random() * 72));
+      expectedDeliveryAt = h(-Math.floor(Math.random() * 24));
+      deliveredAt = h(-Math.floor(Math.random() * 5)); // after deadline
+      break;
+    case 'scheduled':
+      pickupAt = h(Math.floor(Math.random() * 24) + 1);
+      expectedDeliveryAt = h(Math.floor(Math.random() * 72) + 24);
+      deliveredAt = null;
+      break;
+  }
+
+  return {
+    size: rand<PackageSize>(['S', 'M', 'L', 'XL']),
+    pickupAt,
+    expectedDeliveryAt,
+    deliveredAt,
+    notes: `Auto-generated shipment #${index}`,
+    sender: { connect: { id: senderUserId } },
+    origin: { connect: { id: originId } },
+    destination: { connect: { id: destinationId } },
+  };
+}
+
+async function createManyWithConnect(
+  rows: Prisma.ShipmentCreateInput[],
+  chunk = 100,
+) {
+  for (let i = 0; i < rows.length; i += chunk) {
+    const slice = rows.slice(i, i + chunk);
+    await prisma.$transaction(
+      slice.map((d) => prisma.shipment.create({ data: d })),
+    );
+  }
+}
 
 async function main() {
-  const [u1, u2] = await prisma.$transaction([
-    prisma.user.upsert({
-      where: { email: 'alice@example.com' },
-      update: {},
-      create: { email: 'alice@example.com', name: 'Alice' },
-    }),
-    prisma.user.upsert({
-      where: { email: 'bob@example.com' },
-      update: {},
-      create: { email: 'bob@example.com', name: 'Bob' },
-    }),
+  await clearAll();
+
+  const [alice, bob] = await prisma.$transaction([
+    prisma.user.create({ data: { email: 'alice@example.com', name: 'Alice' } }),
+    prisma.user.create({ data: { email: 'bob@example.com', name: 'Bob' } }),
   ]);
 
-  const locations = await prisma.$transaction([
+  const [aHome, aOffice, aWh, bHome, bOffice, bWh] = await prisma.$transaction([
     prisma.location.create({
       data: {
-        userId: u1.id,
+        userId: alice.id,
         nickname: 'Home',
         address1: '1 Main St',
         city: 'Madrid',
@@ -32,7 +120,7 @@ async function main() {
     }),
     prisma.location.create({
       data: {
-        userId: u1.id,
+        userId: alice.id,
         nickname: 'Office',
         address1: '2 Gran Via',
         city: 'Madrid',
@@ -43,7 +131,7 @@ async function main() {
     }),
     prisma.location.create({
       data: {
-        userId: u1.id,
+        userId: alice.id,
         nickname: 'Warehouse',
         address1: '3 Calle A',
         city: 'Barcelona',
@@ -54,9 +142,9 @@ async function main() {
     }),
     prisma.location.create({
       data: {
-        userId: u2.id,
+        userId: bob.id,
         nickname: 'Home',
-        address1: '10 Market St',
+        address1: '10 Market',
         city: 'Valencia',
         country: 'ES',
         lat: 39.4699,
@@ -65,9 +153,9 @@ async function main() {
     }),
     prisma.location.create({
       data: {
-        userId: u2.id,
+        userId: bob.id,
         nickname: 'Office',
-        address1: '11 Office Rd',
+        address1: '11 Office',
         city: 'Seville',
         country: 'ES',
         lat: 37.3891,
@@ -76,7 +164,7 @@ async function main() {
     }),
     prisma.location.create({
       data: {
-        userId: u2.id,
+        userId: bob.id,
         nickname: 'Warehouse',
         address1: '12 Docks',
         city: 'Bilbao',
@@ -87,114 +175,31 @@ async function main() {
     }),
   ]);
 
-  const [aHome, aOffice, aWh, bHome, bOffice, bWh] = locations;
+  const aliceLocs = [aHome.id, aOffice.id, aWh.id];
+  const bobLocs = [bHome.id, bOffice.id, bWh.id];
 
-  const createShipment = (data) => {
-    if (data.originLocationId === data.destinationLocationId) {
-      throw new Error('origin cannot equal destination');
-    }
-    return prisma.shipment.create({ data });
-  };
+  const shipments: Prisma.ShipmentCreateInput[] = [];
 
-  await Promise.all([
-    // In Transit
-    createShipment({
-      senderUserId: u1.id,
-      originLocationId: aHome.id,
-      destinationLocationId: aWh.id,
-      size: 'M',
-      pickupAt: hoursFromNow(-2),
-      expectedDeliveryAt: hoursFromNow(6),
-      deliveredAt: null,
-      notes: 'Books',
-    }),
+  // Change these counts to whatever you want (e.g., 200 each)
+  const COUNT_PER_USER = 120;
 
-    // On Time
-    createShipment({
-      senderUserId: u1.id,
-      originLocationId: aOffice.id,
-      destinationLocationId: bHome.id,
-      size: 'S',
-      pickupAt: hoursFromNow(-10),
-      expectedDeliveryAt: hoursFromNow(-2),
-      deliveredAt: hoursFromNow(-3),
-      notes: 'Small parcel',
-    }),
+  for (let i = 1; i <= COUNT_PER_USER; i++) {
+    const origin = rand(aliceLocs);
+    const dest = rand(bobLocs);
+    if (origin !== dest)
+      shipments.push(makeShipmentData(alice.id, origin, dest, i));
+  }
 
-    // Delayed
-    createShipment({
-      senderUserId: u1.id,
-      originLocationId: aWh.id,
-      destinationLocationId: bOffice.id,
-      size: 'XL',
-      pickupAt: hoursFromNow(-20),
-      expectedDeliveryAt: hoursFromNow(-5),
-      deliveredAt: hoursFromNow(-1),
-      notes: 'Furniture',
-    }),
+  for (let i = 1; i <= COUNT_PER_USER; i++) {
+    const origin = rand(bobLocs);
+    const dest = rand(aliceLocs);
+    if (origin !== dest)
+      shipments.push(makeShipmentData(bob.id, origin, dest, i));
+  }
 
-    // In Transit
-    createShipment({
-      senderUserId: u2.id,
-      originLocationId: bHome.id,
-      destinationLocationId: aHome.id,
-      size: 'L',
-      pickupAt: hoursFromNow(-1),
-      expectedDeliveryAt: hoursFromNow(12),
-      deliveredAt: null,
-      notes: 'Clothes',
-    }),
+  await createManyWithConnect(shipments, 100);
 
-    // On Time
-    createShipment({
-      senderUserId: u2.id,
-      originLocationId: bOffice.id,
-      destinationLocationId: aOffice.id,
-      size: 'M',
-      pickupAt: hoursFromNow(-8),
-      expectedDeliveryAt: hoursFromNow(-1),
-      deliveredAt: hoursFromNow(-1),
-      notes: 'Docs',
-    }),
-
-    // Delayed
-    createShipment({
-      senderUserId: u2.id,
-      originLocationId: bWh.id,
-      destinationLocationId: aWh.id,
-      size: 'S',
-      pickupAt: hoursFromNow(-30),
-      expectedDeliveryAt: hoursFromNow(-10),
-      deliveredAt: hoursFromNow(-2),
-      notes: 'Gadgets',
-    }),
-
-    // Scheduled (not picked up yet) – you can treat as In Transit only after pickup
-    createShipment({
-      senderUserId: u1.id,
-      originLocationId: aHome.id,
-      destinationLocationId: bWh.id,
-      size: 'XL',
-      pickupAt: hoursFromNow(5),
-      expectedDeliveryAt: hoursFromNow(24),
-      deliveredAt: null,
-      notes: 'Scheduled pickup',
-    }),
-
-    // Another On Time
-    createShipment({
-      senderUserId: u2.id,
-      originLocationId: bHome.id,
-      destinationLocationId: aOffice.id,
-      size: 'L',
-      pickupAt: hoursFromNow(-15),
-      expectedDeliveryAt: hoursFromNow(-2),
-      deliveredAt: hoursFromNow(-2),
-      notes: 'Hardware',
-    }),
-  ]);
-
-  console.log('✅ Seeded users, locations, and shipments');
+  console.log(`✅ Seeded ${shipments.length} shipments for Alice and Bob`);
 }
 
 main()
@@ -203,5 +208,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    prisma.$disconnect();
+    await prisma.$disconnect();
   });

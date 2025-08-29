@@ -1,4 +1,9 @@
 import {
+  CreateShipmentSchema,
+  deriveStatus,
+  UpdateShipmentSchema,
+} from '@app/shared';
+import {
   Body,
   Controller,
   Delete,
@@ -13,8 +18,6 @@ import {
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SupabaseService } from '../supabase/supabase.service';
-import { CreateShipmentSchema, UpdateShipmentSchema } from '@app/shared';
-import { deriveStatus } from '@app/shared';
 
 const ListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),

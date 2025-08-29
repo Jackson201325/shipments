@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
+import { DevModule } from './dev/dev.module';
+import { LocationsModule } from './locations/locations.module';
+import { ShipmentsModule } from './shipments/shipments.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -8,10 +11,9 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     UsersModule,
+    ShipmentsModule,
+    DevModule,
+    LocationsModule,
   ],
-  controllers: [],
-  providers: [],
 })
 export class AppModule {}
-
-// https://doptuxxpnmzbiowyhzhc.supabase.co

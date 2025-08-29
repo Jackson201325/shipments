@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ShipmentsService } from './shipments.service';
-import { PrismaService } from '../database/prisma.service';
 import { ShipmentsController } from './shipments.controllers';
+import { SupabaseModule } from 'src/supabase/supabase.module';
 
 @Module({
+  imports: [SupabaseModule],
   controllers: [ShipmentsController],
-  providers: [ShipmentsService, PrismaService],
+  providers: [],
 })
 export class ShipmentsModule {}

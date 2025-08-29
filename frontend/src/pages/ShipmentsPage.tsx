@@ -1,31 +1,30 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useInfiniteShipments } from "@/lib/useInfiniteShipments";
+import { getActiveToken } from "@/lib/devAuth";
 import { deriveStatus, type Shipment } from "@app/shared";
-import { useEffect, useRef } from "react";
+import { useShipments } from "@/lib/useInfiniteShipments";
+
+const PER_PAGE = 20;
 
 export function ShipmentsPage() {
+  const token = getActiveToken();
+  const [page, setPage] = useState(1);
   const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    data = [],
     status,
     error,
-  } = useInfiniteShipments();
+    isFetching,
+    refetch,
+  } = useShipments(page, PER_PAGE);
 
-  // simple intersection observer for infinite scroll
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
-      }
-    });
-    io.observe(sentinelRef.current);
-    return () => io.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  if (!token) {
+    return (
+      <div className="p-6 text-sm">
+        Sign in (impersonate) on the Users page first.
+      </div>
+    );
+  }
 
   if (status === "pending") return <div className="p-6">Loading…</div>;
   if (status === "error")
@@ -33,55 +32,69 @@ export function ShipmentsPage() {
       <div className="p-6 text-destructive">{(error as Error).message}</div>
     );
 
-  const items = data?.pages.flatMap((p) => p.items) ?? [];
+  const items: Shipment[] = data;
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Shipments</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Shipments</h1>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
 
-      hello
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {items.map((s: Shipment) => {
+      <div className="flex flex-col gap-3">
+        {items.map((s) => {
           const status = deriveStatus({
             pickupAt: s.pickupAt,
             expectedDeliveryAt: s.expectedDeliveryAt,
             deliveredAt: s.deliveredAt,
           });
           return (
-            <Card key={s.id}>
-              <CardHeader>
+            <Card key={s.id} className="w-full">
+              <CardHeader className="flex flex-row justify-between items-center">
                 <CardTitle>Shipment #{s.id}</CardTitle>
+                <span className="text-sm text-muted-foreground">{status}</span>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-sm">
+              <CardContent className="flex justify-between text-sm">
+                <div>
                   Size: <b>{s.size}</b>
                 </div>
-                <div className="text-sm">
-                  Status: <b>{status}</b>
-                </div>
                 {s.notes && (
-                  <div className="text-sm text-muted-foreground">{s.notes}</div>
+                  <div className="text-muted-foreground">{s.notes}</div>
                 )}
               </CardContent>
             </Card>
           );
         })}
+        {items.length === 0 && (
+          <div className="text-sm text-muted-foreground">No shipments.</div>
+        )}
       </div>
 
-      {hasNextPage ? (
-        <div className="flex justify-center items-center py-6">
-          <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-            {isFetchingNextPage ? "Loading…" : "Load more"}
-          </Button>
-        </div>
-      ) : (
-        <div className="py-6 text-sm text-center text-muted-foreground">
-          No more shipments
-        </div>
-      )}
-
-      {/* auto loader */}
-      <div ref={sentinelRef} />
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || isFetching}
+        >
+          Prev
+        </Button>
+        <Button
+          onClick={() => setPage((p) => p + 1)}
+          disabled={isFetching || items.length < PER_PAGE}
+        >
+          Next
+        </Button>
+        <span className="self-center text-sm text-muted-foreground">
+          Page {page}
+        </span>
+      </div>
     </div>
   );
 }

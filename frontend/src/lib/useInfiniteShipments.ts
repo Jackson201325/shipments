@@ -1,29 +1,17 @@
-import { PaginatedShipments, type Shipment } from "@app/shared";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { PaginatedShipments } from "@app/shared";
 import { apiFetch } from "./api";
+import { getActiveToken } from "./devAuth";
 
-type PageResponse = Shipment[];
+export function useShipments(page: number, perPage = 20) {
+  const token = getActiveToken(); // so cache busts when you switch user
 
-const PAGE_SIZE = 20;
-
-async function fetchShipments({ pageParam = 1 }: { pageParam?: number }) {
-  const raw: PageResponse = await apiFetch(
-    `/shipments?page=${pageParam}&perPage=${PAGE_SIZE}`,
-  );
-
-  const data = PaginatedShipments.parse(raw);
-
-  return {
-    items: data,
-    nextCursor: data.length === PAGE_SIZE ? pageParam + 1 : null,
-  };
-}
-
-export function useInfiniteShipments() {
-  return useInfiniteQuery({
-    queryKey: ["shipments"],
-    queryFn: fetchShipments,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  return useQuery({
+    queryKey: ["shipments", token, page, perPage],
+    enabled: !!token,
+    queryFn: async () => {
+      const raw = await apiFetch(`/shipments?page=${page}&perPage=${perPage}`);
+      return PaginatedShipments.parse(raw);
+    },
   });
 }

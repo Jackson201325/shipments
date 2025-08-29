@@ -6,10 +6,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: ['http://localhost:3001'],
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    maxAge: 86400,
   });
 
   await app.listen(3000);

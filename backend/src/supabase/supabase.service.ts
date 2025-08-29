@@ -2,17 +2,30 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class SupabaseService {
-  private base = process.env.SUPABASE_URL!;
-  private anon = process.env.SUPABASE_ANON_KEY!;
+  private base: string;
+  private anon: string;
+
+  constructor() {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      throw new Error('SUPABASE_URL / SUPABASE_ANON_KEY not set');
+    }
+    this.base = process.env.SUPABASE_URL;
+    this.anon = process.env.SUPABASE_ANON_KEY;
+  }
 
   private headers(authHeader?: string) {
-    const h: Record<string, string> = {
-      apikey: this.anon,
-      'content-type': 'application/json',
-    };
     if (!authHeader) throw new UnauthorizedException('Missing Authorization');
-    h.authorization = authHeader;
-    return h;
+
+    const value = authHeader.startsWith('Bearer ')
+      ? authHeader
+      : `Bearer ${authHeader}`;
+
+    return {
+      apikey: this.anon, // anon public key
+      'Content-Type': 'application/json',
+      Authorization: value, // Bearer token
+      Prefer: 'return=representation',
+    };
   }
 
   async listShipments(auth: string, limit: number, offset: number) {
