@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PackageSize {
+  S
+  M
+  L
+  XL
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  locations Location[]
+  shipments Shipment[] @relation("UserShipments")
+}
+
+model Location {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  nickname   String
+  address1   String
+  address2   String?
+  city       String
+  state      String?
+  country    String
+  postalCode String?
+  lat        Float
+  lng        Float
+  createdAt  DateTime @default(now())
+
+  user                   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipmentsAsOrigin      Shipment[] @relation("ShipmentOrigin")
+  shipmentsAsDestination Shipment[] @relation("ShipmentDestination")
+
+  @@unique([userId, nickname])
+  @@index([lat, lng])
+}
+
+model Shipment {
+  id                    Int         @id @default(autoincrement())
+  senderUserId          Int
+  originLocationId      Int
+  destinationLocationId Int
+  size                  PackageSize
+  createdAt             DateTime    @default(now())
+  pickupAt              DateTime?
+  expectedDeliveryAt    DateTime?
+  deliveredAt           DateTime?
+  notes                 String?
+
+  sender      User     @relation("UserShipments", fields: [senderUserId], references: [id], onDelete: Cascade)
+  origin      Location @relation("ShipmentOrigin", fields: [originLocationId], references: [id], onDelete: Restrict)
+  destination Location @relation("ShipmentDestination", fields: [destinationLocationId], references: [id], onDelete: Restrict)
+
+  @@index([senderUserId])
+  @@index([originLocationId])
+  @@index([destinationLocationId])
+}

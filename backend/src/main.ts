@@ -1,0 +1,10 @@
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { NotFoundFilter } from './common/not-found.filter';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalFilters(new NotFoundFilter());
+  await app.listen(3000);
+}
+bootstrap();
