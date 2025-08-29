@@ -1,25 +1,43 @@
+// backend/src/users/users.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import type { CreateUser, User } from '@app/shared';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  create(dto: CreateUserDto) {
-    return this.prisma.user.create({ data: dto });
+  private toUserDto(row: {
+    id: number;
+    email: string;
+    name: string | null;
+    createdAt: Date;
+  }): User {
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name ?? null,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
-  findAll() {
-    return this.prisma.user.findMany();
+  async create(dto: CreateUser): Promise<User> {
+    const row = await this.prisma.user.create({ data: dto });
+    return this.toUserDto(row);
   }
 
-  findByEmail(email: string) {
-    console.log('👉 Inside findByEmail(), email =', email);
-    return this.prisma.user.findUnique({ where: { email } });
+  async findAll(): Promise<User[]> {
+    const rows = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
+    return rows.map(this.toUserDto);
   }
 
-  remove(id: number) {
-    return this.prisma.user.delete({ where: { id } });
+  async findByEmail(email: string): Promise<User | null> {
+    const row = await this.prisma.user.findUnique({ where: { email } });
+    return row ? this.toUserDto(row) : null;
+  }
+
+  async remove(id: number): Promise<User> {
+    const row = await this.prisma.user.delete({ where: { id } });
+    return this.toUserDto(row);
   }
 }

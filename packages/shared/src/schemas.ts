@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-export const PackageSizeSchema = z.enum(["S", "M", "L", "XL"]);
+const PackageSizeSchema = z.enum(["S", "M", "L", "XL"]);
 
-export const ShipmentSchema = z.object({
+const ShipmentSchema = z.object({
   id: z.number(),
   size: PackageSizeSchema,
   notes: z.string().nullable(),
@@ -11,6 +11,55 @@ export const ShipmentSchema = z.object({
   deliveredAt: z.string().nullable(),
 });
 
-export const ShipmentsPageSchema = z.array(ShipmentSchema);
+export const PaginatedShipments = z.array(ShipmentSchema);
 
+const DateLikeNullable = z.union([z.date(), z.string().datetime()]).nullable();
+
+export const CreateShipmentSchema = z
+  .object({
+    senderUserId: z.number().int().positive(),
+    originLocationId: z.number().int().positive(),
+    destinationLocationId: z.number().int().positive(),
+    size: PackageSizeSchema,
+    pickupAt: DateLikeNullable.optional(),
+    expectedDeliveryAt: DateLikeNullable.optional(),
+    notes: z.string().trim().min(1).max(10_000).nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.originLocationId === val.destinationLocationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "originLocationId cannot equal destinationLocationId",
+        path: ["destinationLocationId"],
+      });
+    }
+  });
+
+export const UpdateShipmentSchema = z.object({
+  destinationLocationId: z.number().int().positive().optional(),
+  size: PackageSizeSchema.optional(),
+  expectedDeliveryAt: DateLikeNullable.optional(),
+  notes: z.string().trim().min(1).max(10_000).nullable().optional(),
+});
+
+export type CreateShipment = z.infer<typeof CreateShipmentSchema>;
+export type UpdateShipment = z.infer<typeof UpdateShipmentSchema>;
+export type PackageSize = z.infer<typeof PackageSizeSchema>;
 export type Shipment = z.infer<typeof ShipmentSchema>;
+
+export const UserSchema = z.object({
+  id: z.number().int().positive(),
+  email: z.string().email(),
+  name: z.string().min(1).nullable().optional(),
+  createdAt: z.string(),
+});
+
+export const CreateUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).nullable().optional(),
+});
+
+export const UsersArraySchema = z.array(UserSchema);
+
+export type User = z.infer<typeof UserSchema>;
+export type CreateUser = z.infer<typeof CreateUserSchema>;

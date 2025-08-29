@@ -1,23 +1,17 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { PaginatedShipments, type Shipment } from "@app/shared";
 import { apiFetch } from "./api";
-
-export type Shipment = {
-  id: number;
-  size: "S" | "M" | "L" | "XL";
-  notes: string | null;
-  pickupAt: string | null;
-  expectedDeliveryAt: string | null;
-  deliveredAt: string | null;
-};
 
 type PageResponse = Shipment[];
 
 const PAGE_SIZE = 20;
 
 async function fetchShipments({ pageParam = 1 }: { pageParam?: number }) {
-  const data: PageResponse = await apiFetch(
+  const raw: PageResponse = await apiFetch(
     `/shipments?page=${pageParam}&perPage=${PAGE_SIZE}`,
   );
+
+  const data = PaginatedShipments.parse(raw);
 
   return {
     items: data,

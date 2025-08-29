@@ -1,10 +1,10 @@
 export type ShipmentStatus = "In Transit" | "On Time" | "Delayed";
 
-export function deriveStatus(s: {
+export const deriveStatus = (s: {
   pickupAt: string | Date | null;
   expectedDeliveryAt: string | Date | null;
   deliveredAt: string | Date | null;
-}): ShipmentStatus {
+}): ShipmentStatus => {
   const toDate = (d: any) => (d ? new Date(d) : null);
   const pickupAt = toDate(s.pickupAt);
   const expected = toDate(s.expectedDeliveryAt);
@@ -16,4 +16,4 @@ export function deriveStatus(s: {
   }
   if (pickupAt && pickupAt <= new Date()) return "In Transit";
   return "In Transit";
-}
+};
