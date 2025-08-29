@@ -6,34 +6,24 @@ const now = new Date();
 const h = (hours: number) => new Date(now.getTime() + hours * 3600 * 1000);
 
 async function clearAll() {
-  await prisma.shipment.deleteMany();
-  await prisma.location.deleteMany();
-  await prisma.user.deleteMany();
-
   try {
     await prisma.$executeRawUnsafe(`
-      DO $$
-      BEGIN
-        -- Works if columns are IDENTITY (Prisma on PG usually is)
-        BEGIN
-          EXECUTE 'ALTER TABLE "User"     ALTER COLUMN id RESTART WITH 1';
-        EXCEPTION WHEN others THEN NULL; END;
-        BEGIN
-          EXECUTE 'ALTER TABLE "Location" ALTER COLUMN id RESTART WITH 1';
-        EXCEPTION WHEN others THEN NULL; END;
-        BEGIN
-          EXECUTE 'ALTER TABLE "Shipment" ALTER COLUMN id RESTART WITH 1';
-        EXCEPTION WHEN others THEN NULL; END;
-      END$$;
+      TRUNCATE TABLE "Shipment", "Location", "User" RESTART IDENTITY CASCADE;
     `);
-  } catch (_) {}
+  } catch (e) {
+    console.warn('TRUNCATE failed, falling back to deleteMany');
+    await prisma.shipment.deleteMany();
+    await prisma.location.deleteMany();
+    await prisma.user.deleteMany();
+  }
 }
 
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-type Kind = 'inTransit' | 'onTime' | 'delayed' | 'scheduled';
+// Removed "scheduled", added "delivered"
+type Kind = 'inTransit' | 'onTime' | 'delayed' | 'delivered';
 
 function makeShipmentData(
   senderUserId: number,
@@ -44,7 +34,7 @@ function makeShipmentData(
     throw new Error('origin cannot equal destination');
   }
 
-  const kind: Kind = rand(['inTransit', 'onTime', 'delayed', 'scheduled']);
+  const kind: Kind = rand(['inTransit', 'onTime', 'delayed', 'delivered']);
 
   let pickupAt: Date | null = null;
   let expectedDeliveryAt: Date | null = null;
@@ -56,20 +46,27 @@ function makeShipmentData(
       expectedDeliveryAt = h(Math.floor(Math.random() * 24) + 2);
       deliveredAt = null;
       break;
+
     case 'onTime':
       pickupAt = h(-Math.floor(Math.random() * 48));
       expectedDeliveryAt = h(-Math.floor(Math.random() * 12));
-      deliveredAt = expectedDeliveryAt; // on time
+      deliveredAt = expectedDeliveryAt; // delivered on time
       break;
+
     case 'delayed':
       pickupAt = h(-Math.floor(Math.random() * 72));
       expectedDeliveryAt = h(-Math.floor(Math.random() * 24));
-      deliveredAt = h(-Math.floor(Math.random() * 5)); // after deadline
+      deliveredAt = h(-Math.floor(Math.random() * 5)); // delivered after deadline
       break;
-    case 'scheduled':
-      pickupAt = h(Math.floor(Math.random() * 24) + 1);
-      expectedDeliveryAt = h(Math.floor(Math.random() * 72) + 24);
-      deliveredAt = null;
+
+    case 'delivered':
+      pickupAt = h(-Math.floor(Math.random() * 72));
+      expectedDeliveryAt = h(-Math.floor(Math.random() * 48));
+      if (Math.random() < 0.5) {
+        deliveredAt = expectedDeliveryAt; // on time
+      } else {
+        deliveredAt = h(-Math.floor(Math.random() * 5)); // late
+      }
       break;
   }
 
@@ -177,22 +174,19 @@ async function main() {
   const bobLocs = [bHome.id, bOffice.id, bWh.id];
 
   const shipments: Prisma.ShipmentCreateInput[] = [];
-
-  // Change these counts to whatever you want (e.g., 200 each)
   const COUNT_PER_USER = 120;
 
   for (let i = 1; i <= COUNT_PER_USER; i++) {
     const origin = rand(aliceLocs);
     const dest = rand(bobLocs);
     if (origin !== dest)
-      shipments.push(makeShipmentData(alice.id, origin, dest, i));
+      shipments.push(makeShipmentData(alice.id, origin, dest));
   }
 
   for (let i = 1; i <= COUNT_PER_USER; i++) {
     const origin = rand(bobLocs);
     const dest = rand(aliceLocs);
-    if (origin !== dest)
-      shipments.push(makeShipmentData(bob.id, origin, dest, i));
+    if (origin !== dest) shipments.push(makeShipmentData(bob.id, origin, dest));
   }
 
   await createManyWithConnect(shipments, 100);

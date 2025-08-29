@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function UsersPage() {
-  const { data = [], status, error, refetch, isFetching } = useUsers();
+  const { data = [], status, error, refetch } = useUsers();
   const navigate = useNavigate();
 
   const handleImpersonate = async (id: number) => {
@@ -23,13 +23,6 @@ export function UsersPage() {
     <div className="p-6 space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Users</h1>
-        <button
-          className="text-sm underline disabled:opacity-50"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          {isFetching ? "Refreshing…" : "Refresh"}
-        </button>
       </div>
 
       <Card>

@@ -1,5 +1,14 @@
 import { getActiveToken } from "./devAuth";
 
+const RAW_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = (RAW_BASE ?? "").replace(/\/+$/, "");
+
+if (!API_BASE) {
+  console.warn(
+    "[api] VITE_API_URL is not set. Falling back to http://localhost:3000",
+  );
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = getActiveToken();
 
@@ -10,7 +19,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
   if (token) merged.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${import.meta.env.VITE_API_URL}${path}`, {
+  const res = await fetch(`${RAW_BASE}${path}`, {
     ...options,
     headers: merged,
   });

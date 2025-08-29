@@ -1,4 +1,3 @@
-// frontend/src/lib/useShipments.ts
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
 import { APIShipmentsArraySchema, type APIShipment } from "@app/shared";
